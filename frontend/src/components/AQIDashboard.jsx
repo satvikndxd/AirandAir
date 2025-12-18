@@ -323,56 +323,65 @@ const AQIDashboard = () => {
                         </div>
                     )}
 
-                    {/* ML Prediction & Forecast */}
+                    {/* ML Forecast & API Forecast */}
                     {locationData && (
                         <div className="animate-slide-up" style={{ marginTop: '48px' }}>
-                            {/* ML Prediction */}
-                            {locationData.ml_prediction && (
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '16px',
-                                    marginBottom: '32px',
-                                    padding: '16px 20px',
-                                    background: 'rgba(95,131,150,0.08)',
-                                    borderRadius: '8px',
-                                }}>
+                            {/* ML Forecast - Next 3 hours */}
+                            {locationData.ml_forecast && locationData.ml_forecast.length > 0 && (
+                                <div style={{ marginBottom: '32px' }}>
                                     <div style={{
-                                        width: '8px',
-                                        height: '8px',
-                                        borderRadius: '50%',
-                                        background: '#5F8396',
-                                        animation: 'pulse-slow 2s infinite',
-                                    }} />
-                                    <div>
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        marginBottom: '16px',
+                                    }}>
+                                        <div style={{
+                                            width: '8px',
+                                            height: '8px',
+                                            borderRadius: '50%',
+                                            background: '#5F8396',
+                                            animation: 'pulse-slow 2s infinite',
+                                        }} />
                                         <span style={{
                                             fontSize: '11px',
-                                            color: '#6F6558',
+                                            color: '#5F8396',
                                             textTransform: 'uppercase',
-                                            letterSpacing: '1px',
+                                            letterSpacing: '2px',
+                                            fontWeight: '600',
                                         }}>
-                                            ML Prediction
+                                            ML Forecast
                                         </span>
-                                        <div style={{
-                                            fontSize: '24px',
-                                            fontWeight: '500',
-                                            color: '#2F4A61',
-                                            marginTop: '4px',
-                                        }}>
-                                            {locationData.ml_prediction}
-                                            <span style={{
-                                                fontSize: '14px',
-                                                color: '#BCB9AC',
-                                                marginLeft: '8px',
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '12px' }}>
+                                        {locationData.ml_forecast.map((f, i) => (
+                                            <div key={i} style={{
+                                                padding: '12px 16px',
+                                                background: 'rgba(95,131,150,0.12)',
+                                                borderRadius: '6px',
+                                                textAlign: 'center',
+                                                border: '1px solid rgba(95,131,150,0.2)',
                                             }}>
-                                                vs {aqi} live
-                                            </span>
-                                        </div>
+                                                <div style={{
+                                                    fontSize: '11px',
+                                                    color: '#5F8396',
+                                                    marginBottom: '4px',
+                                                }}>
+                                                    {f.hour}
+                                                </div>
+                                                <div style={{
+                                                    fontSize: '18px',
+                                                    fontWeight: '600',
+                                                    color: '#2F4A61',
+                                                }}>
+                                                    {f.aqi}
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             )}
 
-                            {/* 6-Hour Forecast */}
+                            {/* Satellite Forecast - Next 6 hours */}
                             {locationData.forecast && locationData.forecast.length > 0 && (
                                 <div>
                                     <span style={{
@@ -383,10 +392,10 @@ const AQIDashboard = () => {
                                         display: 'block',
                                         marginBottom: '16px',
                                     }}>
-                                        Next 6 hours
+                                        Satellite Forecast
                                     </span>
-                                    <div style={{ display: 'flex', gap: '12px' }}>
-                                        {locationData.forecast.map((f, i) => (
+                                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                                        {locationData.forecast.slice(0, 6).map((f, i) => (
                                             <div key={i} style={{
                                                 padding: '12px 16px',
                                                 background: 'rgba(188,185,172,0.15)',
@@ -499,10 +508,10 @@ const AQIDashboard = () => {
                                 maxWidth: '500px',
                                 paddingBottom: '80px',
                             }}>
-                                {/* ML Prediction vs Live */}
+                                {/* ML vs Satellite Forecast */}
                                 <PredictionComparison
-                                    actual={locationData.aqi}
-                                    predicted={locationData.ml_prediction}
+                                    mlForecast={locationData.ml_forecast}
+                                    satelliteForecast={locationData.forecast}
                                 />
 
                                 {/* Trend Chart */}

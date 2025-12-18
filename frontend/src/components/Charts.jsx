@@ -79,17 +79,19 @@ export const ForecastChart = ({ data }) => {
     );
 };
 
-// Prediction vs Actual - minimal comparison
-export const PredictionComparison = ({ actual, predicted }) => {
-    if (!predicted) return null;
+// ML vs Satellite Forecast Comparison
+export const PredictionComparison = ({ mlForecast, satelliteForecast }) => {
+    if (!mlForecast || mlForecast.length === 0) return null;
 
-    const diff = predicted - actual;
-    const diffPercent = ((diff / actual) * 100).toFixed(1);
-
-    const data = [
-        { name: 'Live', value: actual },
-        { name: 'ML', value: predicted },
-    ];
+    // Combine ML and satellite forecasts for comparison
+    const comparisonData = mlForecast.map((ml, i) => {
+        const satellite = satelliteForecast?.find(s => s.hour === ml.hour);
+        return {
+            hour: ml.hour,
+            ml: ml.aqi,
+            satellite: satellite?.aqi || null,
+        };
+    });
 
     return (
         <div style={{
@@ -99,61 +101,41 @@ export const PredictionComparison = ({ actual, predicted }) => {
             borderRadius: '12px',
             border: `1px solid rgba(188,185,172,0.3)`,
         }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
-                <div>
-                    <span style={{
-                        fontSize: '11px',
-                        color: colors.earth,
-                        textTransform: 'uppercase',
-                        letterSpacing: '1px',
-                    }}>
-                        ML Prediction
-                    </span>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginTop: '8px' }}>
-                        <span style={{
-                            fontSize: '48px',
-                            fontWeight: '300',
-                            color: colors.navy,
-                            letterSpacing: '-2px',
-                            lineHeight: '1',
-                        }}>
-                            {predicted}
-                        </span>
-                        <span style={{
-                            fontSize: '14px',
-                            color: diff > 0 ? colors.earth : colors.steel,
-                        }}>
-                            {diff > 0 ? '↑' : '↓'} {Math.abs(diffPercent)}% from live
-                        </span>
-                    </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                    <span style={{ fontSize: '11px', color: colors.sage }}>LIVE</span>
-                    <div style={{ fontSize: '24px', color: colors.ink, fontWeight: '500' }}>{actual}</div>
-                </div>
+            <div style={{ marginBottom: '16px' }}>
+                <span style={{
+                    fontSize: '11px',
+                    color: colors.earth,
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px',
+                }}>
+                    ML vs Satellite Forecast
+                </span>
             </div>
 
-            {/* Visual comparison bar */}
-            <div style={{ position: 'relative', height: '8px', background: 'rgba(188,185,172,0.3)', borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{
-                    position: 'absolute',
-                    height: '100%',
-                    width: `${(actual / Math.max(actual, predicted)) * 100}%`,
-                    background: colors.steel,
-                    borderRadius: '4px',
-                }} />
-                <div style={{
-                    position: 'absolute',
-                    height: '100%',
-                    left: `${(predicted / Math.max(actual, predicted)) * 100}%`,
-                    width: '2px',
-                    background: colors.navy,
-                    transform: 'translateX(-50%)',
-                }} />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
-                <span style={{ fontSize: '10px', color: colors.sage }}>Live measurement</span>
-                <span style={{ fontSize: '10px', color: colors.sage }}>ML prediction</span>
+            <ResponsiveContainer width="100%" height={120}>
+                <BarChart data={comparisonData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                    <XAxis
+                        dataKey="hour"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: colors.earth, fontSize: 10 }}
+                    />
+                    <YAxis hide domain={[0, 'dataMax + 20']} />
+                    <Tooltip content={<MinimalTooltip />} />
+                    <Bar dataKey="ml" fill={colors.steel} name="ML Forecast" radius={[4, 4, 0, 0]} barSize={20} />
+                    <Bar dataKey="satellite" fill={colors.sage} name="Satellite" radius={[4, 4, 0, 0]} barSize={20} />
+                </BarChart>
+            </ResponsiveContainer>
+
+            <div style={{ display: 'flex', gap: '24px', marginTop: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '12px', height: '12px', background: colors.steel, borderRadius: '2px' }} />
+                    <span style={{ fontSize: '11px', color: colors.earth }}>ML Forecast</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '12px', height: '12px', background: colors.sage, borderRadius: '2px' }} />
+                    <span style={{ fontSize: '11px', color: colors.earth }}>Satellite</span>
+                </div>
             </div>
         </div>
     );

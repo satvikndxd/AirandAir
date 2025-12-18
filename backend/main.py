@@ -143,27 +143,17 @@ async def get_real_aqi(lat: float, lng: float):
                 
                 risk_level, color = get_health_risk(aqi)
                 
-                # ML prediction
-                ml_prediction = None
-                if model and pollutants:
-                    try:
-                        pm25_val = pollutants.get("PM2.5", 30)
-                        pm10_val = pollutants.get("PM10", pm25_val * 1.5)
-                        no2_val = pollutants.get("NO₂", 20)
-                        so2_val = pollutants.get("SO₂", 10)
-                        co_val = pollutants.get("CO", 0.5)
-                        o3_val = pollutants.get("O₃", 30)
-                        
-                        input_df = pd.DataFrame([{
-                            'PM2.5': pm25_val, 'PM10': pm10_val, 'NO2': no2_val,
-                            'SO2': so2_val, 'CO': co_val, 'O3': o3_val
-                        }])
-                        ml_prediction = max(0, model.predict(input_df)[0])
-                    except Exception as e:
-                        print(f"ML prediction error: {e}")
+                # Get pollutant values for ML
+                pm25_val = pollutants.get("PM2.5", 30)
+                pm10_val = pollutants.get("PM10", pm25_val * 1.5)
+                no2_val = pollutants.get("NO₂", 20)
+                so2_val = pollutants.get("SO₂", 10)
+                co_val = pollutants.get("CO", 0.5)
+                o3_val = pollutants.get("O₃", 30)
                 
                 # Generate hourly forecast from API data
                 forecast = []
+                api_forecast = []
                 if "hourly" in data and "us_aqi" in data["hourly"]:
                     hourly_aqi = data["hourly"]["us_aqi"]
                     hourly_time = data["hourly"]["time"]
@@ -173,10 +163,56 @@ async def get_real_aqi(lat: float, lng: float):
                     for i in range(current_hour + 1, min(current_hour + 7, len(hourly_aqi))):
                         if hourly_aqi[i] is not None:
                             hour_str = pd.Timestamp(hourly_time[i]).strftime("%I %p")
-                            forecast.append({
+                            api_forecast.append({
                                 "hour": hour_str,
-                                "aqi": round(hourly_aqi[i])
+                                "aqi": round(hourly_aqi[i]),
+                                "source": "satellite"
                             })
+                
+                # ML Forecast: Predict next 3 hours using trend analysis
+                ml_forecast = []
+                if model and pollutants:
+                    try:
+                        # Simulate pollutant trends for next 3 hours
+                        # Typical patterns: PM increases in evening, decreases at night
+                        hour_now = pd.Timestamp.now().hour
+                        
+                        for h in range(1, 4):  # Next 1, 2, 3 hours
+                            future_hour = (hour_now + h) % 24
+                            
+                            # Apply time-based modifiers (rush hours, night reduction)
+                            if 7 <= future_hour <= 10 or 17 <= future_hour <= 20:
+                                # Rush hours - pollution tends to increase
+                                modifier = 1.0 + (0.05 * h)
+                            elif 0 <= future_hour <= 5:
+                                # Night - pollution tends to decrease
+                                modifier = 1.0 - (0.03 * h)
+                            else:
+                                modifier = 1.0
+                            
+                            # Predict with modified pollutants
+                            input_df = pd.DataFrame([{
+                                'PM2.5': pm25_val * modifier,
+                                'PM10': pm10_val * modifier,
+                                'NO2': no2_val * modifier,
+                                'SO2': so2_val,
+                                'CO': co_val * modifier,
+                                'O3': o3_val * (2 - modifier)  # O3 inversely correlated
+                            }])
+                            
+                            predicted_aqi = max(0, model.predict(input_df)[0])
+                            hour_str = pd.Timestamp.now().replace(hour=future_hour).strftime("%I %p")
+                            
+                            ml_forecast.append({
+                                "hour": hour_str,
+                                "aqi": round(predicted_aqi),
+                                "source": "ml"
+                            })
+                    except Exception as e:
+                        print(f"ML forecast error: {e}")
+                
+                # Combine forecasts - use API forecast (more accurate), ML fills gaps
+                forecast = api_forecast if api_forecast else ml_forecast
                 
                 return {
                     "success": True,
@@ -186,11 +222,11 @@ async def get_real_aqi(lat: float, lng: float):
                         "lng": lng
                     },
                     "aqi": aqi,
-                    "ml_prediction": round(ml_prediction) if ml_prediction else None,
+                    "ml_forecast": ml_forecast,  # ML-based forecast for next 3 hours
                     "risk_level": risk_level,
                     "color": color,
                     "pollutants": pollutants,
-                    "forecast": forecast,
+                    "forecast": forecast,  # API-based forecast
                     "source": "Open-Meteo Live",
                     "timestamp": pd.Timestamp.now().isoformat(),
                     "last_updated": pd.Timestamp.now().strftime("%H:%M:%S")
