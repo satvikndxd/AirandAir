@@ -305,8 +305,8 @@ async def get_real_aqi(lat: float, lng: float):
                     "pollution_sources": pollution_sources,  # ML source attribution
                     "forecast": forecast,  # API-based forecast
                     "source": "Open-Meteo Live",
-                    "timestamp": pd.Timestamp.now().isoformat(),
-                    "last_updated": pd.Timestamp.now().strftime("%H:%M:%S")
+                    "timestamp": (pd.Timestamp.utcnow() + pd.Timedelta(seconds=data.get("utc_offset_seconds", 0))).isoformat(),
+                    "last_updated": (pd.Timestamp.utcnow() + pd.Timedelta(seconds=data.get("utc_offset_seconds", 0))).strftime("%H:%M:%S")
                 }
             else:
                 raise Exception("No current data in API response")
