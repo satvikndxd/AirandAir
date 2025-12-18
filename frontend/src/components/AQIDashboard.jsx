@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import SearchBar from './SearchBar';
 import GlobeView from './GlobeView';
-import { ForecastChart, PredictionComparison, ModelAccuracyChart, PollutantChart } from './Charts';
+import { ForecastChart, PredictionComparison, ModelAccuracyChart, PollutantChart, PollutionSourcesChart } from './Charts';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -528,6 +528,9 @@ const AQIDashboard = () => {
 
                                 {/* Pollutant Breakdown */}
                                 <PollutantChart pollutants={locationData.pollutants} />
+
+                                {/* Pollution Sources Attribution */}
+                                <PollutionSourcesChart sources={locationData.pollution_sources} />
                             </div>
                         )}
                     </div>

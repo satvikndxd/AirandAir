@@ -282,3 +282,113 @@ export const PollutantChart = ({ pollutants }) => {
         </div>
     );
 };
+
+// Pollution Sources Attribution - donut chart with breakdown
+export const PollutionSourcesChart = ({ sources }) => {
+    if (!sources) return null;
+
+    const sourceLabels = {
+        traffic: { label: 'Traffic & Vehicles', icon: '🚗', color: '#5F8396' },
+        industrial: { label: 'Industrial', icon: '🏭', color: '#6F6558' },
+        dust: { label: 'Dust & Construction', icon: '🏗️', color: '#BCB9AC' },
+        biomass: { label: 'Biomass Burning', icon: '🔥', color: '#C4956A' },
+        photochemical: { label: 'Photochemical', icon: '☀️', color: '#8BA894' },
+    };
+
+    const data = Object.entries(sources)
+        .filter(([_, value]) => value > 0)
+        .map(([key, value]) => ({
+            name: sourceLabels[key]?.label || key,
+            value: value,
+            icon: sourceLabels[key]?.icon || '•',
+            color: sourceLabels[key]?.color || colors.sage,
+        }))
+        .sort((a, b) => b.value - a.value);
+
+    const topSource = data[0];
+
+    return (
+        <div style={{ width: '100%', marginTop: '32px' }}>
+            <span style={{
+                fontSize: '11px',
+                color: colors.sage,
+                textTransform: 'uppercase',
+                letterSpacing: '2px',
+                display: 'block',
+                marginBottom: '16px',
+            }}>
+                Pollution Sources
+            </span>
+
+            <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
+                {/* Donut Chart */}
+                <ResponsiveContainer width={130} height={130}>
+                    <PieChart>
+                        <Pie
+                            data={data}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={40}
+                            outerRadius={55}
+                            paddingAngle={2}
+                            dataKey="value"
+                            stroke="none"
+                        >
+                            {data.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                        </Pie>
+                    </PieChart>
+                </ResponsiveContainer>
+
+                {/* Legend & Top Source */}
+                <div style={{ flex: 1 }}>
+                    {/* Primary Source */}
+                    <div style={{
+                        padding: '12px 16px',
+                        background: 'rgba(95,131,150,0.08)',
+                        borderRadius: '8px',
+                        marginBottom: '12px',
+                    }}>
+                        <div style={{ fontSize: '11px', color: colors.earth, marginBottom: '4px' }}>
+                            Primary Source
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '20px' }}>{topSource?.icon}</span>
+                            <span style={{ fontSize: '16px', fontWeight: '600', color: colors.navy }}>
+                                {topSource?.name}
+                            </span>
+                            <span style={{
+                                fontSize: '14px',
+                                color: colors.steel,
+                                marginLeft: 'auto',
+                                fontWeight: '600'
+                            }}>
+                                {topSource?.value}%
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Other Sources */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {data.slice(1).map((item, i) => (
+                            <div key={i} style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 8px',
+                                background: 'rgba(188,185,172,0.15)',
+                                borderRadius: '4px',
+                            }}>
+                                <span style={{ fontSize: '12px' }}>{item.icon}</span>
+                                <span style={{ fontSize: '10px', color: colors.earth }}>
+                                    {item.value}%
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
