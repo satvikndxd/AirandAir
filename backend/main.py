@@ -229,12 +229,17 @@ async def get_real_aqi(lat: float, lng: float):
                 ml_forecast = []
                 if model and pollutants:
                     try:
-                        # Simulate pollutant trends for next 3 hours
-                        # Typical patterns: PM increases in evening, decreases at night
-                        hour_now = pd.Timestamp.now().hour
+                        # Get current hour from API's timezone-aware data
+                        if "hourly" in data and "time" in data["hourly"] and len(data["hourly"]["time"]) > 0:
+                            # Use the first hourly time to determine location's current time
+                            first_time = pd.Timestamp(data["hourly"]["time"][0])
+                            # Find current hour index based on API times
+                            current_hour = first_time.hour + (pd.Timestamp.now().hour - first_time.hour) % 24
+                        else:
+                            current_hour = pd.Timestamp.now().hour
                         
                         for h in range(1, 4):  # Next 1, 2, 3 hours
-                            future_hour = (hour_now + h) % 24
+                            future_hour = (current_hour + h) % 24
                             
                             # Apply time-based modifiers (rush hours, night reduction)
                             if 7 <= future_hour <= 10 or 17 <= future_hour <= 20:
@@ -257,7 +262,12 @@ async def get_real_aqi(lat: float, lng: float):
                             }])
                             
                             predicted_aqi = max(0, model.predict(input_df)[0])
-                            hour_str = pd.Timestamp.now().replace(hour=future_hour).strftime("%I %p")
+                            # Use API hourly time if available for proper timezone
+                            hour_index = current_hour + h
+                            if "hourly" in data and hour_index < len(data["hourly"]["time"]):
+                                hour_str = pd.Timestamp(data["hourly"]["time"][hour_index]).strftime("%I %p")
+                            else:
+                                hour_str = f"{future_hour:02d}:00"
                             
                             ml_forecast.append({
                                 "hour": hour_str,
