@@ -480,40 +480,41 @@ const AQIDashboard = () => {
                                 {selectedLocation.lat.toFixed(4)}° N · {Math.abs(selectedLocation.lng).toFixed(4)}° {selectedLocation.lng >= 0 ? 'E' : 'W'}
                             </span>
                         </div>
+
+
+                        {/* Charts Section */}
+                        {locationData && (
+                            <div style={{
+                                width: '100%',
+                                maxWidth: '500px',
+                                paddingBottom: '80px',
+                            }}>
+                                {/* ML vs Satellite Forecast */}
+                                <PredictionComparison
+                                    mlForecast={locationData.ml_forecast}
+                                    satelliteForecast={locationData.forecast}
+                                />
+
+
+                                {/* Model Accuracy Chart */}
+                                <ModelAccuracyChart
+                                    mlForecast={locationData.ml_forecast}
+                                    satelliteForecast={locationData.forecast}
+                                />
+
+                                {/* Forecast Chart */}
+                                {locationData.forecast && locationData.forecast.length > 0 && (
+                                    <ForecastChart data={locationData.forecast} />
+                                )}
+
+                                {/* Pollutant Breakdown */}
+                                <PollutantChart pollutants={locationData.pollutants} />
+
+                                {/* Pollution Sources Attribution */}
+                                <PollutionSourcesChart sources={locationData.pollution_sources} />
+                            </div>
+                        )}
                     </div>
-
-                    {/* Charts Section */}
-                    {locationData && (
-                        <div style={{
-                            width: '100%',
-                            maxWidth: '500px',
-                            paddingBottom: '80px',
-                        }}>
-                            {/* ML vs Satellite Forecast */}
-                            <PredictionComparison
-                                mlForecast={locationData.ml_forecast}
-                                satelliteForecast={locationData.forecast}
-                            />
-
-
-                            {/* Model Accuracy Chart */}
-                            <ModelAccuracyChart
-                                mlForecast={locationData.ml_forecast}
-                                satelliteForecast={locationData.forecast}
-                            />
-
-                            {/* Forecast Chart */}
-                            {locationData.forecast && locationData.forecast.length > 0 && (
-                                <ForecastChart data={locationData.forecast} />
-                            )}
-
-                            {/* Pollutant Breakdown */}
-                            <PollutantChart pollutants={locationData.pollutants} />
-
-                            {/* Pollution Sources Attribution */}
-                            <PollutionSourcesChart sources={locationData.pollution_sources} />
-                        </div>
-                    )}
                 </div>
             </main>
 
