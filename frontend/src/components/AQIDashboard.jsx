@@ -475,76 +475,93 @@ const AQIDashboard = () => {
                         overflowY: 'auto',
                         paddingRight: '40px',
                     }}>
-                        {/* Globe */}
-                        <div style={{ position: 'relative', width: '100%' }}>
-                            <GlobeView
-                                selectedLocation={selectedLocation}
-                                onLocationSelect={handleLocationSelect}
-                            />
-
-                            {/* Coordinates */}
+                        {/* Globe Container - Fixed circular spot */}
+                        <div style={{
+                            position: 'relative',
+                            width: 'min(500px, 60vh)',
+                            height: 'min(500px, 60vh)',
+                            borderRadius: '50%',
+                            background: '#F2F2F0', // Grey circular spot
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            overflow: 'hidden', // Contain the globe
+                            boxShadow: 'inset 0 0 40px rgba(0,0,0,0.05)', // Subtle inner shadow for depth
+                        }}>
                             <div style={{
-                                position: 'absolute',
-                                bottom: '-40px',
-                                left: '50%',
-                                transform: 'translateX(-50%)',
-                                textAlign: 'center',
+                                width: '120%', // Slightly larger to fill edges if needed
+                                height: '120%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
                             }}>
-                                <span style={{
-                                    fontFamily: "'Space Grotesk', sans-serif",
-                                    fontSize: '11px',
-                                    color: '#BCB9AC',
-                                    letterSpacing: '3px',
-                                }}>
-                                    {selectedLocation.lat.toFixed(4)}° N · {Math.abs(selectedLocation.lng).toFixed(4)}° {selectedLocation.lng >= 0 ? 'E' : 'W'}
-                                </span>
+                                <GlobeView
+                                    selectedLocation={selectedLocation}
+                                    onLocationSelect={handleLocationSelect}
+                                />
                             </div>
                         </div>
 
-                        {/* Charts Section */}
-                        {locationData && (
-                            <div style={{
-                                width: '100%',
-                                maxWidth: '500px',
-                                paddingBottom: '80px',
+                        {/* Coordinates */}
+                        <div style={{
+                            marginTop: '24px',
+                            textAlign: 'center',
+                        }}>
+                            <span style={{
+                                fontFamily: "'Space Grotesk', sans-serif",
+                                fontSize: '11px',
+                                color: '#BCB9AC',
+                                letterSpacing: '3px',
                             }}>
-                                {/* ML vs Satellite Forecast */}
-                                <PredictionComparison
-                                    mlForecast={locationData.ml_forecast}
-                                    satelliteForecast={locationData.forecast}
-                                />
-
-
-                                {/* Model Accuracy Chart */}
-                                <ModelAccuracyChart
-                                    mlForecast={locationData.ml_forecast}
-                                    satelliteForecast={locationData.forecast}
-                                />
-
-                                {/* Forecast Chart */}
-                                {locationData.forecast && locationData.forecast.length > 0 && (
-                                    <ForecastChart data={locationData.forecast} />
-                                )}
-
-                                {/* Pollutant Breakdown */}
-                                <PollutantChart pollutants={locationData.pollutants} />
-
-                                {/* Pollution Sources Attribution */}
-                                <PollutionSourcesChart sources={locationData.pollution_sources} />
-                            </div>
-                        )}
+                                {selectedLocation.lat.toFixed(4)}° N · {Math.abs(selectedLocation.lng).toFixed(4)}° {selectedLocation.lng >= 0 ? 'E' : 'W'}
+                            </span>
+                        </div>
                     </div>
-                </div>
-            </main>
 
-            {/* Bottom accent */}
-            <div style={{
-                position: 'fixed',
-                bottom: 0,
-                left: 0,
+                    {/* Charts Section */}
+                    {locationData && (
+                        <div style={{
+                            width: '100%',
+                            maxWidth: '500px',
+                            paddingBottom: '80px',
+                        }}>
+                            {/* ML vs Satellite Forecast */}
+                            <PredictionComparison
+                                mlForecast={locationData.ml_forecast}
+                                satelliteForecast={locationData.forecast}
+                            />
+
+
+                            {/* Model Accuracy Chart */}
+                            <ModelAccuracyChart
+                                mlForecast={locationData.ml_forecast}
+                                satelliteForecast={locationData.forecast}
+                            />
+
+                            {/* Forecast Chart */}
+                            {locationData.forecast && locationData.forecast.length > 0 && (
+                                <ForecastChart data={locationData.forecast} />
+                            )}
+
+                            {/* Pollutant Breakdown */}
+                            <PollutantChart pollutants={locationData.pollutants} />
+
+                            {/* Pollution Sources Attribution */}
+                            <PollutionSourcesChart sources={locationData.pollution_sources} />
+                        </div>
+                    )}
+                </div>
+        </div >
+            </main >
+
+    {/* Bottom accent */ }
+    < div style = {{
+    position: 'fixed',
+        bottom: 0,
+            left: 0,
                 right: 0,
-                height: '4px',
-                background: `linear-gradient(90deg, 
+                    height: '4px',
+                        background: `linear-gradient(90deg, 
                     #BCB9AC 0%, 
                     #5F8396 25%, 
                     #2F4A61 50%, 
@@ -552,7 +569,7 @@ const AQIDashboard = () => {
                     #242527 100%
                 )`,
             }} />
-        </div>
+        </div >
     );
 };
 
