@@ -551,25 +551,24 @@ const AQIDashboard = () => {
                         </div>
                     )}
                 </div>
-        </div >
-            </main >
+            </main>
 
-    {/* Bottom accent */ }
-    < div style = {{
-    position: 'fixed',
-        bottom: 0,
-            left: 0,
+            {/* Bottom accent */}
+            <div style={{
+                position: 'fixed',
+                bottom: 0,
+                left: 0,
                 right: 0,
-                    height: '4px',
-                        background: `linear-gradient(90deg, 
-                    #BCB9AC 0%, 
-                    #5F8396 25%, 
-                    #2F4A61 50%, 
-                    #6F6558 75%, 
-                    #242527 100%
-                )`,
+                height: '4px',
+                background: `linear-gradient(90deg, 
+            #BCB9AC 0%, 
+            #5F8396 25%, 
+            #2F4A61 50%, 
+            #6F6558 75%, 
+            #242527 100%
+        )`,
             }} />
-        </div >
+        </div>
     );
 };
 
