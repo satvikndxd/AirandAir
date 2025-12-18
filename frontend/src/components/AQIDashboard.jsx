@@ -476,7 +476,7 @@ const AQIDashboard = () => {
                         paddingRight: '40px',
                     }}>
                         {/* Globe */}
-                        <div style={{ position: 'relative' }}>
+                        <div style={{ position: 'relative', width: '100%' }}>
                             <GlobeView
                                 selectedLocation={selectedLocation}
                                 onLocationSelect={handleLocationSelect}

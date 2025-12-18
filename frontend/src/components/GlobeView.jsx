@@ -3,6 +3,31 @@ import Globe from 'react-globe.gl';
 
 const GlobeView = ({ selectedLocation, onLocationSelect }) => {
     const globeEl = useRef();
+    const containerRef = useRef();
+    const [dimensions, setDimensions] = React.useState({ width: 500, height: 500 });
+
+    useEffect(() => {
+        const updateDimensions = () => {
+            if (containerRef.current) {
+                setDimensions({
+                    width: containerRef.current.clientWidth,
+                    height: containerRef.current.clientHeight || 500
+                });
+            }
+        };
+
+        window.addEventListener('resize', updateDimensions);
+        updateDimensions();
+
+        // Resize observer for more robust resizing
+        const observer = new ResizeObserver(updateDimensions);
+        if (containerRef.current) observer.observe(containerRef.current);
+
+        return () => {
+            window.removeEventListener('resize', updateDimensions);
+            observer.disconnect();
+        };
+    }, []);
 
     useEffect(() => {
         if (globeEl.current) {
@@ -31,17 +56,24 @@ const GlobeView = ({ selectedLocation, onLocationSelect }) => {
 
     return (
         <div
+            ref={containerRef}
             onMouseDown={handleInteraction}
             onTouchStart={handleInteraction}
             style={{
+                width: '100%',
+                height: '500px', // Fixed height container
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
                 filter: 'saturate(0.3) contrast(1.1)',
                 opacity: 0.9,
+                cursor: 'grab',
             }}
         >
             <Globe
                 ref={globeEl}
-                width={500}
-                height={500}
+                width={dimensions.width}
+                height={dimensions.height}
                 globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
                 bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
                 backgroundColor="rgba(0,0,0,0)"
