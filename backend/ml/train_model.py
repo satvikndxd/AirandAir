@@ -52,36 +52,70 @@ def calculate_aqi_accurate(pm25, pm10, no2, so2, co, o3):
     return np.array(aqi_values)
 
 def generate_realistic_data(n_samples=20000):
-    """Generate realistic synthetic data with correlated pollutants."""
+    """Generate realistic synthetic data matching Open-Meteo API ranges."""
     np.random.seed(42)
     
-    rush_hour = np.random.choice([0, 1], n_samples, p=[0.7, 0.3])
-    industrial = np.random.choice([0, 1], n_samples, p=[0.8, 0.2])
-    traffic = np.random.uniform(0.5, 2.0, n_samples)
+    # Open-Meteo typically returns values in these realistic ranges
+    # PM2.5: 5-300 µg/m³ (most common 10-100)
+    # PM10: 10-400 µg/m³ (most common 20-150)
+    # NO2: 5-150 µg/m³ (most common 10-60)
+    # SO2: 2-100 µg/m³ (most common 5-40)
+    # O3: 10-150 µg/m³ (most common 20-80)
+    # CO: 0.1-5 mg/m³ (most common 0.2-1.5)
     
-    pm25_base = np.random.gamma(3, 15, n_samples)
-    pm25 = pm25_base * (1 + 0.5 * rush_hour + 0.8 * industrial) * traffic
-    pm25 = np.clip(pm25, 0, 500)
+    # Generate base conditions (good/moderate/poor air quality mix)
+    condition = np.random.choice([0, 1, 2], n_samples, p=[0.5, 0.35, 0.15])  # good, moderate, poor
     
-    pm10 = pm25 * np.random.uniform(1.2, 2.5, n_samples) + np.random.normal(0, 10, n_samples)
-    pm10 = np.clip(pm10, 0, 600)
+    # PM2.5 - primary driver of AQI
+    pm25 = np.where(condition == 0, 
+                    np.random.uniform(5, 35, n_samples),      # Good
+                    np.where(condition == 1,
+                             np.random.uniform(35, 90, n_samples),   # Moderate
+                             np.random.uniform(90, 250, n_samples))) # Poor
+    pm25 += np.random.normal(0, 5, n_samples)
+    pm25 = np.clip(pm25, 1, 400)
     
-    no2_base = np.random.gamma(2, 20, n_samples)
-    no2 = no2_base * (1 + rush_hour * 0.7) * traffic
-    no2 = np.clip(no2, 0, 200)
+    # PM10 - correlated with PM2.5
+    pm10 = pm25 * np.random.uniform(1.1, 1.8, n_samples) + np.random.normal(5, 8, n_samples)
+    pm10 = np.clip(pm10, 2, 500)
     
-    so2_base = np.random.exponential(15, n_samples)
-    so2 = so2_base * (1 + industrial * 1.5)
-    so2 = np.clip(so2, 0, 200)
+    # NO2 - traffic-related
+    no2 = np.where(condition == 0,
+                   np.random.uniform(5, 40, n_samples),
+                   np.where(condition == 1,
+                            np.random.uniform(40, 80, n_samples),
+                            np.random.uniform(80, 150, n_samples)))
+    no2 += np.random.normal(0, 5, n_samples)
+    no2 = np.clip(no2, 1, 180)
     
-    co_base = np.random.gamma(1.5, 1, n_samples)
-    co = co_base * (1 + rush_hour * 0.5) * traffic
-    co = np.clip(co, 0, 20)
+    # SO2 - industrial
+    so2 = np.where(condition == 0,
+                   np.random.uniform(2, 20, n_samples),
+                   np.where(condition == 1,
+                            np.random.uniform(20, 50, n_samples),
+                            np.random.uniform(50, 100, n_samples)))
+    so2 += np.random.normal(0, 3, n_samples)
+    so2 = np.clip(so2, 1, 150)
     
-    o3_base = np.random.gamma(2, 25, n_samples)
-    o3 = o3_base * (1 - 0.3 * (no2 / 200)) + np.random.normal(0, 5, n_samples)
-    o3 = np.clip(o3, 0, 200)
+    # O3 - inversely correlated with NO2 somewhat
+    o3 = np.where(condition == 0,
+                  np.random.uniform(15, 50, n_samples),
+                  np.where(condition == 1,
+                           np.random.uniform(30, 70, n_samples),
+                           np.random.uniform(50, 120, n_samples)))
+    o3 += np.random.normal(0, 5, n_samples)
+    o3 = np.clip(o3, 5, 150)
     
+    # CO - traffic-related (in mg/m³)
+    co = np.where(condition == 0,
+                  np.random.uniform(0.1, 0.6, n_samples),
+                  np.where(condition == 1,
+                           np.random.uniform(0.5, 1.2, n_samples),
+                           np.random.uniform(1.0, 3.0, n_samples)))
+    co += np.random.normal(0, 0.1, n_samples)
+    co = np.clip(co, 0.05, 5)
+    
+    # Calculate AQI using EPA breakpoints
     aqi = calculate_aqi_accurate(pm25, pm10, no2, so2, co, o3)
     
     df = pd.DataFrame({
