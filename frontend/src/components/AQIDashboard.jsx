@@ -179,19 +179,9 @@ const AQIDashboard = () => {
             </header>
 
             {/* Main content */}
-            <main style={{
-                minHeight: '100vh',
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                paddingTop: '100px',
-            }}>
+            <main className="dashboard-grid" style={{ paddingTop: '100px' }}>
                 {/* Left side - Typography focused */}
-                <div style={{
-                    padding: '80px 48px 48px 80px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                }}>
+                <div className="left-panel animate-slide-up">
                     {/* Location */}
                     <div className="animate-slide-up" style={{ marginBottom: '16px' }}>
                         <span style={{
@@ -457,37 +447,11 @@ const AQIDashboard = () => {
                     position: 'relative',
                 }}>
                     {/* Vertical line */}
-                    <div style={{
-                        position: 'absolute',
-                        left: 0,
-                        top: '20%',
-                        bottom: '20%',
-                        width: '1px',
-                        background: 'linear-gradient(to bottom, transparent, #BCB9AC, transparent)',
-                    }} />
+                    <div className="vertical-divider" />
 
-                    <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '40px',
-                        maxHeight: '100vh',
-                        overflowY: 'auto',
-                        paddingRight: '40px',
-                    }}>
+                    <div className="right-panel">
                         {/* Globe Container - Fixed circular spot */}
-                        <div style={{
-                            position: 'relative',
-                            width: 'min(500px, 60vh)',
-                            height: 'min(500px, 60vh)',
-                            borderRadius: '50%',
-                            background: '#F2F2F0', // Grey circular spot
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            overflow: 'hidden', // Contain the globe
-                            boxShadow: 'inset 0 0 40px rgba(0,0,0,0.05)', // Subtle inner shadow for depth
-                        }}>
+                        <div className="globe-container">
                             <div style={{
                                 width: '120%', // Slightly larger to fill edges if needed
                                 height: '120%',
