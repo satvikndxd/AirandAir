@@ -229,39 +229,46 @@ async def get_real_aqi(lat: float, lng: float):
                 ml_forecast = []
                 if model and pollutants:
                     try:
-                        # Get current hour from API's timezone-aware data
-                        if "hourly" in data and "time" in data["hourly"] and len(data["hourly"]["time"]) > 0:
-                            # Use the first hourly time to determine location's current time
-                            first_time = pd.Timestamp(data["hourly"]["time"][0])
-                            # Find current hour index based on API times
-                            current_hour = first_time.hour + (pd.Timestamp.now().hour - first_time.hour) % 24
-                        else:
-                            current_hour = pd.Timestamp.now().hour
+                        # Calibration: Predict for "now" first to find scaling factor
+                        input_now = pd.DataFrame([{
+                            'PM2.5': pm25_val, 'PM10': pm10_val, 'NO2': no2_val,
+                            'SO2': so2_val, 'CO': co_val, 'O3': o3_val
+                        }])
+                        ml_now = max(5, model.predict(input_now)[0])
+                        calibration_factor = aqi / ml_now if ml_now > 0 else 1.0
                         
+                        # Clone pollutants for modification
+                        p_mod = {
+                            'PM2.5': pm25_val, 'PM10': pm10_val, 'NO2': no2_val,
+                            'SO2': so2_val, 'CO': co_val, 'O3': o3_val
+                        }
+                        
+                        # Use current server hour for simpler simulation logic (calibration handles offset)
+                        current_hour = pd.Timestamp.now().hour
+
                         for h in range(1, 4):  # Next 1, 2, 3 hours
                             future_hour = (current_hour + h) % 24
                             
-                            # Apply time-based modifiers (rush hours, night reduction)
-                            if 7 <= future_hour <= 10 or 17 <= future_hour <= 20:
-                                # Rush hours - pollution tends to increase
+                            # Apply time-based modifiers
+                            if 7 <= future_hour <= 10 or 17 <= future_hour <= 20: 
                                 modifier = 1.0 + (0.05 * h)
                             elif 0 <= future_hour <= 5:
-                                # Night - pollution tends to decrease
                                 modifier = 1.0 - (0.03 * h)
                             else:
                                 modifier = 1.0
                             
-                            # Predict with modified pollutants
                             input_df = pd.DataFrame([{
-                                'PM2.5': pm25_val * modifier,
-                                'PM10': pm10_val * modifier,
-                                'NO2': no2_val * modifier,
-                                'SO2': so2_val,
-                                'CO': co_val * modifier,
-                                'O3': o3_val * (2 - modifier)  # O3 inversely correlated
+                                'PM2.5': p_mod['PM2.5'] * modifier,
+                                'PM10': p_mod['PM10'] * modifier,
+                                'NO2': p_mod['NO2'] * modifier,
+                                'SO2': p_mod['SO2'],
+                                'CO': p_mod['CO'] * modifier,
+                                'O3': p_mod['O3'] * (2 - modifier)
                             }])
                             
-                            predicted_aqi = max(0, model.predict(input_df)[0])
+                            # Predict and Calibrate
+                            raw_pred = max(0, model.predict(input_df)[0])
+                            predicted_aqi = raw_pred * calibration_factor
                             # Use API hourly time if available for proper timezone
                             hour_index = current_hour + h
                             if "hourly" in data and hour_index < len(data["hourly"]["time"]):
