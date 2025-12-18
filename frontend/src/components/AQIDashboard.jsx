@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import SearchBar from './SearchBar';
 import GlobeView from './GlobeView';
-import { ForecastChart, PredictionComparison, TrendChart, PollutantChart } from './Charts';
+import { ForecastChart, PredictionComparison, ModelAccuracyChart, PollutantChart } from './Charts';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -79,11 +79,11 @@ const AQIDashboard = () => {
         }
     }, []);
 
-    // Auto-refresh interval
+    // Auto-refresh interval - every 2 minutes
     useEffect(() => {
         const interval = setInterval(() => {
             fetchLocationAQI(selectedLocation.lat, selectedLocation.lng, false);
-        }, 20000);
+        }, 120000); // 2 minutes
         return () => clearInterval(interval);
     }, [selectedLocation.lat, selectedLocation.lng]);
 
@@ -514,10 +514,12 @@ const AQIDashboard = () => {
                                     satelliteForecast={locationData.forecast}
                                 />
 
-                                {/* Trend Chart */}
-                                {history.length > 1 && (
-                                    <TrendChart history={history} />
-                                )}
+
+                                {/* Model Accuracy Chart */}
+                                <ModelAccuracyChart
+                                    mlForecast={locationData.ml_forecast}
+                                    satelliteForecast={locationData.forecast}
+                                />
 
                                 {/* Forecast Chart */}
                                 {locationData.forecast && locationData.forecast.length > 0 && (

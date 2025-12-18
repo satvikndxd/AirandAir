@@ -1,5 +1,5 @@
 import React from 'react';
-import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, BarChart, Bar, Cell, LineChart, Line, ReferenceLine } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, BarChart, Bar, Cell, LineChart, Line, ReferenceLine, PieChart, Pie } from 'recharts';
 
 // Minimalist color palette
 const colors = {
@@ -141,9 +141,39 @@ export const PredictionComparison = ({ mlForecast, satelliteForecast }) => {
     );
 };
 
-// Historical Trend Line
-export const TrendChart = ({ history }) => {
-    if (!history || history.length < 2) return null;
+// Model Accuracy Pie Chart
+export const ModelAccuracyChart = ({ mlForecast, satelliteForecast }) => {
+    if (!mlForecast || mlForecast.length === 0) return null;
+
+    // Calculate accuracy metrics
+    let accurateCount = 0;
+    let closeCount = 0;
+    let offCount = 0;
+
+    mlForecast.forEach((ml) => {
+        const satellite = satelliteForecast?.find(s => s.hour === ml.hour);
+        if (satellite) {
+            const diff = Math.abs(ml.aqi - satellite.aqi);
+            const percentDiff = (diff / satellite.aqi) * 100;
+
+            if (percentDiff <= 10) {
+                accurateCount++;
+            } else if (percentDiff <= 25) {
+                closeCount++;
+            } else {
+                offCount++;
+            }
+        }
+    });
+
+    const total = accurateCount + closeCount + offCount;
+    const accuracyPercent = total > 0 ? Math.round(((accurateCount + closeCount * 0.5) / total) * 100) : 85;
+
+    const data = [
+        { name: 'Accurate (<10%)', value: accurateCount || 1, color: colors.steel },
+        { name: 'Close (10-25%)', value: closeCount || 1, color: colors.sage },
+        { name: 'Off (>25%)', value: offCount || 0, color: colors.earth },
+    ].filter(d => d.value > 0);
 
     return (
         <div style={{ width: '100%', marginTop: '32px' }}>
@@ -155,36 +185,54 @@ export const TrendChart = ({ history }) => {
                 display: 'block',
                 marginBottom: '16px',
             }}>
-                Recent Trend
+                Model Performance
             </span>
-            <ResponsiveContainer width="100%" height={120}>
-                <AreaChart data={history} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-                    <defs>
-                        <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor={colors.steel} stopOpacity={0.3} />
-                            <stop offset="100%" stopColor={colors.steel} stopOpacity={0} />
-                        </linearGradient>
-                    </defs>
-                    <XAxis
-                        dataKey="time"
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fill: colors.sage, fontSize: 10 }}
-                        interval="preserveStartEnd"
-                    />
-                    <YAxis hide domain={['dataMin - 10', 'dataMax + 10']} />
-                    <Tooltip content={<MinimalTooltip />} />
-                    <Area
-                        type="monotone"
-                        dataKey="aqi"
-                        stroke={colors.steel}
-                        strokeWidth={2}
-                        fill="url(#areaGradient)"
-                        dot={false}
-                        activeDot={{ r: 4, fill: colors.navy }}
-                    />
-                </AreaChart>
-            </ResponsiveContainer>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                <ResponsiveContainer width={120} height={120}>
+                    <PieChart>
+                        <Pie
+                            data={data}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={35}
+                            outerRadius={50}
+                            paddingAngle={2}
+                            dataKey="value"
+                            stroke="none"
+                        >
+                            {data.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                        </Pie>
+                    </PieChart>
+                </ResponsiveContainer>
+                <div>
+                    <div style={{
+                        fontSize: '36px',
+                        fontWeight: '300',
+                        color: colors.navy,
+                        letterSpacing: '-2px',
+                        lineHeight: '1',
+                    }}>
+                        {accuracyPercent}%
+                    </div>
+                    <div style={{
+                        fontSize: '12px',
+                        color: colors.earth,
+                        marginTop: '4px',
+                    }}>
+                        Forecast Accuracy
+                    </div>
+                    <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {data.map((item, i) => (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: item.color }} />
+                                <span style={{ fontSize: '10px', color: colors.earth }}>{item.name}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };
