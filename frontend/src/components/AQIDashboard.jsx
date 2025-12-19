@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import SearchBar from './SearchBar';
 import GlobeView from './GlobeView';
 import { ForecastChart, PredictionComparison, ModelAccuracyChart, PollutantChart, PollutionSourcesChart } from './Charts';
+import { CigaretteCalculator, SmartScheduler } from './Widgets';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -414,6 +415,8 @@ const AQIDashboard = () => {
                         </div>
                     )}
 
+                    <CigaretteCalculator pollutants={locationData.pollutants} />
+
                     {/* Source */}
                     {locationData?.source && (
                         <div className="animate-slide-up" style={{
@@ -512,6 +515,8 @@ const AQIDashboard = () => {
 
                                 {/* Pollution Sources Attribution */}
                                 <PollutionSourcesChart sources={locationData.pollution_sources} />
+
+                                <SmartScheduler forecast={locationData.forecast} />
                             </div>
                         )}
                     </div>
