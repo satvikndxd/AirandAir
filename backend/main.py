@@ -5,7 +5,7 @@ import json
 import random
 import joblib
 import numpy as np
-import pandas as pd
+from datetime import datetime, timedelta, timezone
 import os
 import httpx
 
@@ -215,10 +215,12 @@ async def get_real_aqi(lat: float, lng: float):
                     hourly_time = data["hourly"]["time"]
                     
                     # Find current hour index and get next 6 hours
-                    current_hour = pd.Timestamp.now().hour
+                    current_hour = datetime.now().hour
                     for i in range(current_hour + 1, min(current_hour + 7, len(hourly_aqi))):
                         if hourly_aqi[i] is not None:
-                            hour_str = pd.Timestamp(hourly_time[i]).strftime("%I %p")
+                            # Parse ISO string
+                            dt = datetime.fromisoformat(hourly_time[i])
+                            hour_str = dt.strftime("%I %p")
                             api_forecast.append({
                                 "hour": hour_str,
                                 "aqi": round(hourly_aqi[i]),
@@ -230,10 +232,11 @@ async def get_real_aqi(lat: float, lng: float):
                 if model and pollutants:
                     try:
                         # Calibration: Predict for "now" first to find scaling factor
-                        input_now = pd.DataFrame([{
+                        input_now = {
                             'PM2.5': pm25_val, 'PM10': pm10_val, 'NO2': no2_val,
                             'SO2': so2_val, 'CO': co_val, 'O3': o3_val
-                        }])
+                        }
+                        # Pass dict directly (model_wrapper handles it)
                         ml_now = max(5, model.predict(input_now)[0])
                         calibration_factor = aqi / ml_now if ml_now > 0 else 1.0
                         
@@ -244,7 +247,7 @@ async def get_real_aqi(lat: float, lng: float):
                         }
                         
                         # Use current server hour for simpler simulation logic (calibration handles offset)
-                        current_hour = pd.Timestamp.now().hour
+                        current_hour = datetime.now().hour
 
                         for h in range(1, 4):  # Next 1, 2, 3 hours
                             future_hour = (current_hour + h) % 24
@@ -257,22 +260,26 @@ async def get_real_aqi(lat: float, lng: float):
                             else:
                                 modifier = 1.0
                             
-                            input_df = pd.DataFrame([{
+                            input_dict = {
                                 'PM2.5': p_mod['PM2.5'] * modifier,
                                 'PM10': p_mod['PM10'] * modifier,
                                 'NO2': p_mod['NO2'] * modifier,
                                 'SO2': p_mod['SO2'],
                                 'CO': p_mod['CO'] * modifier,
                                 'O3': p_mod['O3'] * (2 - modifier)
-                            }])
+                            }
                             
                             # Predict and Calibrate
-                            raw_pred = max(0, model.predict(input_df)[0])
+                            raw_pred = max(0, model.predict(input_dict)[0])
                             predicted_aqi = raw_pred * calibration_factor
                             # Use API hourly time if available for proper timezone
                             hour_index = current_hour + h
                             if "hourly" in data and hour_index < len(data["hourly"]["time"]):
-                                hour_str = pd.Timestamp(data["hourly"]["time"][hour_index]).strftime("%I %p")
+                                dt_str = data["hourly"]["time"][hour_index]
+                                # Simple parse assuming standard API format
+                                # OpenMeteo gives ISO without Z usually
+                                dt = datetime.fromisoformat(dt_str)
+                                hour_str = dt.strftime("%I %p")
                             else:
                                 hour_str = f"{future_hour:02d}:00"
                             
@@ -305,8 +312,8 @@ async def get_real_aqi(lat: float, lng: float):
                     "pollution_sources": pollution_sources,  # ML source attribution
                     "forecast": forecast,  # API-based forecast
                     "source": "Open-Meteo Live",
-                    "timestamp": (pd.Timestamp.utcnow() + pd.Timedelta(seconds=data.get("utc_offset_seconds", 0))).isoformat(),
-                    "last_updated": (pd.Timestamp.utcnow() + pd.Timedelta(seconds=data.get("utc_offset_seconds", 0))).strftime("%H:%M:%S")
+                    "timestamp": (datetime.now(timezone.utc) + timedelta(seconds=data.get("utc_offset_seconds", 0))).isoformat(),
+                    "last_updated": (datetime.now(timezone.utc) + timedelta(seconds=data.get("utc_offset_seconds", 0))).strftime("%H:%M:%S")
                 }
             else:
                 raise Exception("No current data in API response")
@@ -323,7 +330,7 @@ async def get_real_aqi(lat: float, lng: float):
             "color": color,
             "pollutants": {"PM2.5": round(random.uniform(20, 80), 1)},
             "source": "Estimated (API error)",
-            "last_updated": pd.Timestamp.now().strftime("%H:%M:%S")
+            "last_updated": datetime.now().strftime("%H:%M:%S")
         }
 
 async def generate_sensor_data():
@@ -345,20 +352,24 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await generate_sensor_data()
             
             if model:
-                input_df = pd.DataFrame([data])
-                input_df = input_df[['PM2.5', 'PM10', 'NO2', 'SO2', 'CO', 'O3']]
-                predicted_aqi = model.predict(input_df)[0]
+                # Use dict matching model wrapper expectations
+                input_data = {
+                    'PM2.5': data['PM2.5'], 'PM10': data['PM10'], 
+                    'NO2': data['NO2'], 'SO2': data['SO2'], 
+                    'CO': data['CO'], 'O3': data['O3']
+                }
+                predicted_aqi = model.predict(input_data)[0]
                 predicted_aqi = max(0, predicted_aqi)
             else:
                 predicted_aqi = 0
             
             risk_level, color = get_health_risk(predicted_aqi)
 
-            current_date = pd.Timestamp.now()
+            current_date = datetime.now()
             forecast = []
             for i in range(1, 4):
-                future_date = current_date + pd.Timedelta(days=i)
-                day_name = future_date.day_name()
+                future_date = current_date + timedelta(days=i)
+                day_name = future_date.strftime("%A")
                 f_aqi = max(0, predicted_aqi + random.uniform(-50, 50))
                 f_risk, _ = get_health_risk(f_aqi)
                 condition = "Sunny" if f_aqi < 50 else "Cloudy" if f_aqi < 100 else "Rainy"
@@ -421,30 +432,18 @@ async def simulate_aqi(request: SimulationRequest):
 
     # Run ML Model with new pollutants
     try:
-        # Prepare input dataframe matching model training columns
-        # Model expects: [PM2.5, PM10, NO2, CO, SO2, O3]
-        features = [
-            p.get("PM2.5", 0),
-            p.get("PM10", 0),
-            p.get("NO2", 0),
-            p.get("CO", 0),
-            p.get("SO2", 0),
-            p.get("O₃", 0) # Note: Backend uses O3 or O₃? OpenMeteo uses O₃ usually.
-        ]
-        
-        # Check backend consistency for O3 naming. 
-        # API usually returns "O₃" but model might expect "O3". 
-        # Standardize to what model expects. 
-        # The provided 'model_wrapper.py' handles column mapping internally usually, 
-        # or we passed raw numpy array here in previous code?
-        # Previous code used: model.predict(input_df)[0]
-        # input_df was created from current_data dictionary.
-        
-        input_data = pd.DataFrame([features], columns=['pm25', 'pm10', 'no2', 'co', 'so2', 'o3'])
+        input_dict = {
+            'PM2.5': p.get("PM2.5", 0),
+            'PM10': p.get("PM10", 0),
+            'NO2': p.get("NO2", 0),
+            'CO': p.get("CO", 0),
+            'SO2': p.get("SO2", 0),
+            'O3': p.get("O₃", 0)
+        }
         
         # Use simple prediction if model is loaded
         if model:
-            predicted_aqi = model.predict(input_data)[0]
+            predicted_aqi = model.predict(input_dict)[0]
         else:
             # Fallback simple calculation if model missing
             predicted_aqi = max(p.get("PM2.5", 0) * 2, p.get("PM10", 0)) 
@@ -453,14 +452,15 @@ async def simulate_aqi(request: SimulationRequest):
         predicted_aqi = max(0, predicted_aqi)
         
         # Calculate reduction percentage
-        original_aqi = model.predict(pd.DataFrame([[
-            request.pollutants.get("PM2.5", 0),
-            request.pollutants.get("PM10", 0),
-            request.pollutants.get("NO2", 0),
-            request.pollutants.get("CO", 0),
-            request.pollutants.get("SO2", 0),
-            request.pollutants.get("O₃", 0)
-        ]], columns=['pm25', 'pm10', 'no2', 'co', 'so2', 'o3']))[0] if model else 100
+        original_dict = {
+            'PM2.5': request.pollutants.get("PM2.5", 0),
+            'PM10': request.pollutants.get("PM10", 0),
+            'NO2': request.pollutants.get("NO2", 0),
+            'CO': request.pollutants.get("CO", 0),
+            'SO2': request.pollutants.get("SO2", 0),
+            'O3': request.pollutants.get("O₃", 0)
+        }
+        original_aqi = model.predict(original_dict)[0] if model else 100
         
         improvement = 0
         if original_aqi > 0:
