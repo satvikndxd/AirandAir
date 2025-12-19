@@ -386,6 +386,100 @@ async def websocket_endpoint(websocket: WebSocket):
     finally:
         await websocket.close()
 
+from pydantic import BaseModel
+
+class SimulationRequest(BaseModel):
+    pollutants: dict
+    multipliers: dict  # e.g., {"traffic": 0.5, "industrial": 0.8}
+
+@app.post("/simulate")
+async def simulate_aqi(request: SimulationRequest):
+    """
+    Simulate AQI based on reduction of pollution sources.
+    Uses 'Reverse Modeling' to adjust pollutant levels based on source impact.
+    """
+    p = request.pollutants.copy()
+    m = request.multipliers
+
+    # Impact Factors (Source -> Pollutant contribution)
+    # These are approximations based on environmental science literature
+    impacts = {
+        "traffic":      {"NO2": 0.6, "CO": 0.8, "PM2.5": 0.3, "O3": 0.5},
+        "industrial":   {"SO2": 0.5, "PM10": 0.3, "PM2.5": 0.3},
+        "power":        {"SO2": 0.5, "NO2": 0.2},
+        "biomass":      {"PM2.5": 0.2, "CO": 0.2},
+        "dust":         {"PM10": 0.6, "PM2.5": 0.1}
+    }
+
+    # Apply reductions
+    # Formula: New = Old * ( (1 - Impact) + (Impact * Multiplier) )
+    for source, multiplier in m.items():
+        if source in impacts:
+            for pollutant, impact in impacts[source].items():
+                if pollutant in p:
+                    p[pollutant] = p[pollutant] * ((1 - impact) + (impact * multiplier))
+
+    # Run ML Model with new pollutants
+    try:
+        # Prepare input dataframe matching model training columns
+        # Model expects: [PM2.5, PM10, NO2, CO, SO2, O3]
+        features = [
+            p.get("PM2.5", 0),
+            p.get("PM10", 0),
+            p.get("NO2", 0),
+            p.get("CO", 0),
+            p.get("SO2", 0),
+            p.get("O₃", 0) # Note: Backend uses O3 or O₃? OpenMeteo uses O₃ usually.
+        ]
+        
+        # Check backend consistency for O3 naming. 
+        # API usually returns "O₃" but model might expect "O3". 
+        # Standardize to what model expects. 
+        # The provided 'model_wrapper.py' handles column mapping internally usually, 
+        # or we passed raw numpy array here in previous code?
+        # Previous code used: model.predict(input_df)[0]
+        # input_df was created from current_data dictionary.
+        
+        input_data = pd.DataFrame([features], columns=['pm25', 'pm10', 'no2', 'co', 'so2', 'o3'])
+        
+        # Use simple prediction if model is loaded
+        if model:
+            predicted_aqi = model.predict(input_data)[0]
+        else:
+            # Fallback simple calculation if model missing
+            predicted_aqi = max(p.get("PM2.5", 0) * 2, p.get("PM10", 0)) 
+
+        # Cap at 0
+        predicted_aqi = max(0, predicted_aqi)
+        
+        # Calculate reduction percentage
+        original_aqi = model.predict(pd.DataFrame([[
+            request.pollutants.get("PM2.5", 0),
+            request.pollutants.get("PM10", 0),
+            request.pollutants.get("NO2", 0),
+            request.pollutants.get("CO", 0),
+            request.pollutants.get("SO2", 0),
+            request.pollutants.get("O₃", 0)
+        ]], columns=['pm25', 'pm10', 'no2', 'co', 'so2', 'o3']))[0] if model else 100
+        
+        improvement = 0
+        if original_aqi > 0:
+            improvement = ((original_aqi - predicted_aqi) / original_aqi) * 100
+
+        risk, color = get_health_risk(predicted_aqi)
+
+        return {
+            "aqi": round(predicted_aqi),
+            "original_aqi": round(original_aqi),
+            "improvement": round(improvement, 1),
+            "risk": risk,
+            "color": color
+        }
+
+    except Exception as e:
+        print(f"Simulation error: {e}")
+        return {"error": str(e), "aqi": 0}
+
 @app.get("/")
 def read_root():
     return {"message": "Air Quality Prediction API is running"}

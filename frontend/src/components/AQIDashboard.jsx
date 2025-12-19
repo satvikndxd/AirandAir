@@ -3,6 +3,7 @@ import SearchBar from './SearchBar';
 import GlobeView from './GlobeView';
 import { ForecastChart, PredictionComparison, ModelAccuracyChart, PollutantChart, PollutionSourcesChart } from './Charts';
 import { CigaretteCalculator, SmartScheduler } from './Widgets';
+import Simulator from './Simulator';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -416,6 +417,7 @@ const AQIDashboard = () => {
                     )}
 
                     <CigaretteCalculator pollutants={locationData.pollutants} />
+                    <Simulator pollutants={locationData.pollutants} />
 
                     {/* Source */}
                     {locationData?.source && (
