@@ -3,7 +3,7 @@ import SearchBar from './SearchBar';
 import GlobeView from './GlobeView';
 import { ForecastChart, PredictionComparison, ModelAccuracyChart, PollutantChart, PollutionSourcesChart } from './Charts';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 const AQIDashboard = () => {
     const [selectedLocation, setSelectedLocation] = useState({ lat: 28.6139, lng: 77.2090, name: 'New Delhi' });

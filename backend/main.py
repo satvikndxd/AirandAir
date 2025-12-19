@@ -9,7 +9,7 @@ import pandas as pd
 import os
 import httpx
 
-app = FastAPI()
+app = FastAPI(root_path="/api" if os.environ.get("VERCEL") else "")
 
 # Enable CORS
 app.add_middleware(
