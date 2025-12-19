@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import json
 import random
-import joblib
+
 import numpy as np
 from datetime import datetime, timedelta, timezone
 import os
@@ -23,19 +23,7 @@ app.add_middleware(
 # OpenAQ API base URL
 OPENAQ_API = "https://api.openaq.org/v2"
 
-# Import the model wrapper class (needed for unpickling)
-import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'ml'))
-from model_wrapper import ImprovedAQIModel
 
-# Load the trained model
-MODEL_PATH = os.path.join(os.path.dirname(__file__), 'ml', 'aqi_model.joblib')
-try:
-    model = joblib.load(MODEL_PATH)
-    print("Model loaded successfully.")
-except Exception as e:
-    print(f"Error loading model: {e}")
-    model = None
 
 def get_health_risk(aqi):
     if aqi <= 50:
@@ -107,20 +95,70 @@ def calculate_pollution_sources(pollutants):
     
     return sources
 
-def calculate_aqi_from_pm25(pm25):
-    """Calculate US AQI from PM2.5 concentration"""
-    if pm25 <= 12.0:
-        return ((50 - 0) / (12.0 - 0)) * (pm25 - 0) + 0
-    elif pm25 <= 35.4:
-        return ((100 - 51) / (35.4 - 12.1)) * (pm25 - 12.1) + 51
-    elif pm25 <= 55.4:
-        return ((150 - 101) / (55.4 - 35.5)) * (pm25 - 35.5) + 101
-    elif pm25 <= 150.4:
-        return ((200 - 151) / (150.4 - 55.5)) * (pm25 - 55.5) + 151
-    elif pm25 <= 250.4:
-        return ((300 - 201) / (250.4 - 150.5)) * (pm25 - 150.5) + 201
-    else:
-        return ((500 - 301) / (500.4 - 250.5)) * (pm25 - 250.5) + 301
+def calculate_aqi(pollutants):
+    """
+    Calculate US AQI based on EPA standard breakpoints for available pollutants.
+    Returns the maximum AQI among all pollutants.
+    """
+    def get_aqi_for_pollutant(value, breakpoints):
+        for (low_c, high_c, low_i, high_i) in breakpoints:
+            if low_c <= value <= high_c:
+                return ((high_i - low_i) / (high_c - low_c)) * (value - low_c) + low_i
+        return 0
+
+    aqi_values = []
+    
+    # PM2.5 (ug/m3)
+    if "PM2.5" in pollutants:
+        # Breakpoints: 0-12, 12.1-35.4, 35.5-55.4, 55.5-150.4, 150.5-250.4, 250.5-350.4, 350.5-500.4
+        val = pollutants["PM2.5"]
+        bp = [
+            (0, 12.0, 0, 50), (12.1, 35.4, 51, 100), (35.5, 55.4, 101, 150),
+            (55.5, 150.4, 151, 200), (150.5, 250.4, 201, 300), (250.5, 350.4, 301, 400), (350.5, 500.4, 401, 500)
+        ]
+        aqi_values.append(get_aqi_for_pollutant(val, bp))
+
+    # PM10 (ug/m3)
+    if "PM10" in pollutants:
+        # Breakpoints: 0-54, 55-154, 155-254, 255-354, 355-424, 425-504, 505-604
+        val = pollutants["PM10"]
+        bp = [
+            (0, 54, 0, 50), (55, 154, 51, 100), (155, 254, 101, 150),
+            (255, 354, 151, 200), (355, 424, 201, 300), (425, 504, 301, 400), (505, 604, 401, 500)
+        ]
+        aqi_values.append(get_aqi_for_pollutant(val, bp))
+
+    # O3 (ppb) - OpenMeteo gives ug/m3 usually, need conversion? 
+    # OpenMeteo Air Quality API documentation says Ozone is in ug/m3. 
+    # EPA breakpoints are in ppm or ppb.
+    # Conversion Factor: 1 ppb O3 = 1.96 ug/m3 (at 25C, 1 atm). 
+    # Let's approximate: ppb = ug/m3 / 2.0
+    if "O₃" in pollutants or "O3" in pollutants:
+        val_ug = pollutants.get("O₃") or pollutants.get("O3")
+        val = val_ug / 2.0 # Convert to ppb approx
+        # Breakpoints (8-hour): 0-54, 55-70, 71-85, 86-105, 106-200
+        bp = [
+            (0, 54, 0, 50), (55, 70, 51, 100), (71, 85, 101, 150),
+            (86, 105, 151, 200), (106, 200, 201, 300)
+        ]
+        aqi_values.append(get_aqi_for_pollutant(val, bp))
+
+    # NO2 (ppb) - OpenMeteo NO2 is ug/m3. 
+    # Conversion: 1 ppb = 1.88 ug/m3. 
+    # ppb = ug/m3 / 1.88
+    if "NO2" in pollutants or "NO₂" in pollutants:
+        val_ug = pollutants.get("NO2") or pollutants.get("NO₂")
+        val = val_ug / 1.88
+        bp = [
+            (0, 53, 0, 50), (54, 100, 51, 100), (101, 360, 101, 150),
+            (361, 649, 151, 200), (650, 1249, 201, 300), (1250, 2049, 301, 400)
+        ]
+        aqi_values.append(get_aqi_for_pollutant(val, bp))
+        
+    if not aqi_values:
+        return 0
+        
+    return max(aqi_values)
 
 @app.get("/api/search/{query}")
 async def search_places(query: str):
@@ -229,22 +267,10 @@ async def get_real_aqi(lat: float, lng: float):
                 
                 # ML Forecast: Predict next 3 hours using trend analysis
                 ml_forecast = []
-                if model and pollutants:
+                if pollutants:
                     try:
-                        # Calibration: Predict for "now" first to find scaling factor
-                        input_now = {
-                            'PM2.5': pm25_val, 'PM10': pm10_val, 'NO2': no2_val,
-                            'SO2': so2_val, 'CO': co_val, 'O3': o3_val
-                        }
-                        # Pass dict directly (model_wrapper handles it)
-                        ml_now = max(5, model.predict(input_now)[0])
-                        calibration_factor = aqi / ml_now if ml_now > 0 else 1.0
-                        
                         # Clone pollutants for modification
-                        p_mod = {
-                            'PM2.5': pm25_val, 'PM10': pm10_val, 'NO2': no2_val,
-                            'SO2': so2_val, 'CO': co_val, 'O3': o3_val
-                        }
+                        p_mod = pollutants.copy()
                         
                         # Use current server hour for simpler simulation logic (calibration handles offset)
                         current_hour = datetime.now().hour
@@ -269,9 +295,23 @@ async def get_real_aqi(lat: float, lng: float):
                                 'O3': p_mod['O3'] * (2 - modifier)
                             }
                             
-                            # Predict and Calibrate
-                            raw_pred = max(0, model.predict(input_dict)[0])
-                            predicted_aqi = raw_pred * calibration_factor
+                            input_dict = {
+                                'PM2.5': p_mod.get('PM2.5', 0) * modifier,
+                                'PM10': p_mod.get('PM10', 0) * modifier,
+                                'NO2': p_mod.get('NO₂', 0) * modifier, # Note: using original keys might be safer? 
+                                # Wait, p_mod in previous code was RE-CONSTRUCTED from local vars pm25_val etc.
+                                # Here I copied `pollutants` dict. `pollutants` uses 'NO₂', 'O₃'.
+                                # I should check keys logic.
+                                # Let's stick to using `p_mod` which is pollutants copy.
+                                # And use .get() with correct keys.
+                                # pollutants keys: PM2.5, PM10, NO₂, SO₂, CO, O₃
+                                'SO2': p_mod.get('SO₂', 0),
+                                'CO': p_mod.get('CO', 0) * modifier,
+                                'O3': p_mod.get('O₃', 0) * (2 - modifier)
+                            }
+                            
+                            # Calculate AQI direct
+                            predicted_aqi = calculate_aqi(input_dict)
                             # Use API hourly time if available for proper timezone
                             hour_index = current_hour + h
                             if "hourly" in data and hour_index < len(data["hourly"]["time"]):
@@ -351,17 +391,9 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             data = await generate_sensor_data()
             
-            if model:
-                # Use dict matching model wrapper expectations
-                input_data = {
-                    'PM2.5': data['PM2.5'], 'PM10': data['PM10'], 
-                    'NO2': data['NO2'], 'SO2': data['SO2'], 
-                    'CO': data['CO'], 'O3': data['O3']
-                }
-                predicted_aqi = model.predict(input_data)[0]
-                predicted_aqi = max(0, predicted_aqi)
-            else:
-                predicted_aqi = 0
+            # Calculate AQI directly from sensor data
+            # Sensors use keys: PM2.5, PM10, NO2, SO2, CO, O3 (no subscripts in generate_sensor_data)
+            predicted_aqi = calculate_aqi(data)
             
             risk_level, color = get_health_risk(predicted_aqi)
 
@@ -430,23 +462,18 @@ async def simulate_aqi(request: SimulationRequest):
                 if pollutant in p:
                     p[pollutant] = p[pollutant] * ((1 - impact) + (impact * multiplier))
 
-    # Run ML Model with new pollutants
     try:
         input_dict = {
             'PM2.5': p.get("PM2.5", 0),
             'PM10': p.get("PM10", 0),
-            'NO2': p.get("NO2", 0),
+            'NO2': p.get("NO2", 0) if "NO2" in p else p.get("NO₂", 0),
             'CO': p.get("CO", 0),
-            'SO2': p.get("SO2", 0),
-            'O3': p.get("O₃", 0)
+            'SO2': p.get("SO2", 0) if "SO2" in p else p.get("SO₂", 0),
+            'O3': p.get("O3", 0) if "O3" in p else p.get("O₃", 0)
         }
         
-        # Use simple prediction if model is loaded
-        if model:
-            predicted_aqi = model.predict(input_dict)[0]
-        else:
-            # Fallback simple calculation if model missing
-            predicted_aqi = max(p.get("PM2.5", 0) * 2, p.get("PM10", 0)) 
+        # Calculate AQI
+        predicted_aqi = calculate_aqi(input_dict) 
 
         # Cap at 0
         predicted_aqi = max(0, predicted_aqi)
@@ -455,12 +482,13 @@ async def simulate_aqi(request: SimulationRequest):
         original_dict = {
             'PM2.5': request.pollutants.get("PM2.5", 0),
             'PM10': request.pollutants.get("PM10", 0),
-            'NO2': request.pollutants.get("NO2", 0),
-            'CO': request.pollutants.get("CO", 0),
-            'SO2': request.pollutants.get("SO2", 0),
-            'O3': request.pollutants.get("O₃", 0)
+            'NO2': request.pollutants.get("NO2", 0), # Frontend might send NO2 vs NO₂? Frontend uses response from API which has NO₂.
+            # But the simulation request usually sends what it received.
+            # Let's handle both.
+            # Actually calculate_aqi handles both.
+            # I can just pass request.pollutants directly!
         }
-        original_aqi = model.predict(original_dict)[0] if model else 100
+        original_aqi = calculate_aqi(request.pollutants)
         
         improvement = 0
         if original_aqi > 0:
