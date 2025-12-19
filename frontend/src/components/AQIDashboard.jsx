@@ -27,7 +27,7 @@ const AQIDashboard = () => {
                     const newEntry = {
                         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                         aqi: result.aqi,
-                        predicted: result.ml_prediction
+                        predicted: result.ml_forecast && result.ml_forecast.length > 0 ? result.ml_forecast[0].aqi : null
                     };
                     // Keep last 10 entries
                     const updated = [...prev, newEntry].slice(-10);
@@ -416,8 +416,13 @@ const AQIDashboard = () => {
                         </div>
                     )}
 
-                    <CigaretteCalculator pollutants={locationData.pollutants} />
-                    <Simulator pollutants={locationData.pollutants} />
+                    {/* Widgets - Only show if data is available */}
+                    {locationData && (
+                        <>
+                            <CigaretteCalculator pollutants={locationData.pollutants} />
+                            <Simulator pollutants={locationData.pollutants} />
+                        </>
+                    )}
 
                     {/* Source */}
                     {locationData?.source && (
